@@ -39,7 +39,7 @@ During deployment, a `RoleDefinitionDoesNotExist` error was identified due to a 
 * Bicep CLI installed.
 
 ### Steps
-1. **Clone the repository:**
+1. 1. **Clone the repository:**
    ```bash
-   git clone [https://github.com/YOUR_USERNAME/Azure-Bicep-Identity-Lab.git](https://github.com/YOUR_USERNAME/Azure-Bicep-Identity-Lab.git)
+   git clone [https://github.com/rogersombe/Azure-Bicep-Identity-Lab.git](https://github.com/rogersombe/Azure-Bicep-Identity-Lab.git)
    cd Azure-Bicep-Identity-Lab
