@@ -14,7 +14,7 @@ This project demonstrates an end-to-end, modular infrastructure deployment using
 | **Virtual Machine** | `vm.bicep` | An Ubuntu 22.04 LTS compute instance with the Managed Identity injected at the hardware layer. |
 | **Orchestrator** | `main.bicep` | The root template managing resource dependencies and parameter inheritance. |
 ### 🛰️ Resource Dependency Map
-![Architecture Diagram](./architecture-diagram.png)
+![Architecture Diagram](./architecture-diagram.jpg)
 ---
 
 ## 🛠️ 2. Engineering Highlights & Problem Solving
