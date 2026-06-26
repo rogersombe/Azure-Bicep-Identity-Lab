@@ -1,0 +1,97 @@
+digraph IdentityFlow {
+    graph [
+        label="IDENTITY FLOW DIAGRAM — Authentication, Authorization and Trust Chain\nDerived from Bicep | Azure-Bicep-Identity-Lab | User-Assigned Managed Identity + RBAC"
+        labelloc=t
+        fontname="Helvetica"
+        fontsize=14
+        fontcolor="#f0f6fc"
+        bgcolor="#0d1117"
+        pad=1.0
+        nodesep=1.2
+        ranksep=1.0
+        rankdir=TB
+    ]
+
+    node [fontname="Helvetica" fontsize=10 style="filled,rounded" shape=box margin="0.2,0.12"]
+    edge [fontname="Helvetica" fontsize=9]
+
+    // ── Step 1: Identity Created ──────────────────────────────────
+    UAMI [
+        label="User-Assigned Managed Identity\nId-RogersLab-Identity\n(standalone — not tied to one resource)"
+        fillcolor="#264f78" fontcolor="#cae8ff" color="#58a6ff"
+    ]
+
+    A1 [
+        label="1. IDENTITY CREATED (USER-ASSIGNED)\nUAMI exists independently of any VM.\nCan be attached to multiple resources.\nLifecycle not tied to the VM.\nKey difference from System-Assigned."
+        shape=note fillcolor="#161b22" fontcolor="#8b949e" color="#30363d"
+    ]
+
+    // ── Step 2: Identity Attached to VM ──────────────────────────
+    VM [
+        label="Virtual Machine\nvm-rogers-lab\nidentity.type: UserAssigned\nuserAssignedIdentities: { UAMI.resourceId: {} }"
+        fillcolor="#1a7f37" fontcolor="white" color="#3fb950"
+    ]
+
+    A2 [
+        label="2. IDENTITY ATTACHED TO VM\nUAMI.resourceId injected at the hardware layer.\nVM inherits the identity at provision time.\nNo secrets. No keys. No connection strings."
+        shape=note fillcolor="#161b22" fontcolor="#8b949e" color="#30363d"
+    ]
+
+    // ── Step 3: RBAC Binding on Key Vault ────────────────────────
+    KV [
+        label="Key Vault\nkv-rl-{uniqueString}\nenableRbacAuthorization: true"
+        fillcolor="#6e40c9" fontcolor="white" color="#8957e5"
+    ]
+
+    RoleAssignment [
+        label="Role Assignment\nKey Vault Secrets User\n─────────────────────\nroleId: 4633458b-...\nprincipalId: UAMI.principalId\nprincipalType: ServicePrincipal\nscope: this vault only"
+        fillcolor="#553098" fontcolor="#d2a8ff" color="#8957e5"
+        shape=ellipse
+    ]
+
+    A3 [
+        label="3. RBAC BINDING — LEAST PRIVILEGE\nUAMI.principalId bound to Key Vault Secrets User.\nCan read secrets. Cannot manage keys or vault.\nRBAC not access policies — auditable, revocable.\nAbsolute role definition path prevents GUID mismatch."
+        shape=note fillcolor="#161b22" fontcolor="#8b949e" color="#30363d"
+    ]
+
+    // ── Step 4: VM authenticates to Key Vault ────────────────────
+    EntraID [
+        label="Entra ID (Azure AD)\nAuthentication\nVM presents UAMI token"
+        fillcolor="#0d419d" fontcolor="white" color="#388bfd"
+    ]
+
+    A4 [
+        label="4. VM AUTHENTICATES AS UAMI\nVM requests token from Entra ID IMDS endpoint.\nPresents UAMI identity — no password, no secret.\nEntra ID validates and returns bearer token."
+        shape=note fillcolor="#161b22" fontcolor="#8b949e" color="#30363d"
+    ]
+
+    // ── Step 5: Result ────────────────────────────────────────────
+    Result [
+        label="Key Vault\nSecrets accessible to VM\nvia UAMI token\n(Key Vault Secrets User scope only)"
+        fillcolor="#1a7f37" fontcolor="white" color="#3fb950"
+    ]
+
+    A5 [
+        label="5. RESULT — SECRETLESS ACCESS\nVM reads secrets from Key Vault as itself.\nNo stored credentials anywhere in the codebase.\nLeast privilege: Secrets User — not Owner, not Contributor.\nIdentity-First posture true in code, not just in docs."
+        shape=note fillcolor="#161b22" fontcolor="#8b949e" color="#30363d"
+    ]
+
+    // ── Main trust chain ──────────────────────────────────────────
+    UAMI -> VM              [label="resourceId → attached at provision"
+                             color="#58a6ff" fontcolor="#79c0ff"]
+    UAMI -> RoleAssignment  [label="principalId → RBAC binding"
+                             color="#58a6ff" fontcolor="#79c0ff" style=dashed]
+    RoleAssignment -> KV    [label="scoped to this vault"
+                             color="#8957e5" fontcolor="#d2a8ff"]
+    VM -> EntraID           [label="authenticates as UAMI\n(IMDS token request)"
+                             color="#388bfd" fontcolor="#79c0ff"]
+    EntraID -> Result       [label="token validated\nRBAC evaluated → access granted"
+                             color="#3fb950" fontcolor="#56d364"]
+
+    // ── Rank alignment ────────────────────────────────────────────
+    { rank=same; UAMI;         A1 }
+    { rank=same; VM;           A2 }
+    { rank=same; KV;           RoleAssignment; A3 }
+    { rank=same; EntraID;      A4 }
+    { rank=same; Result;       A5 }
+}

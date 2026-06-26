@@ -1,0 +1,108 @@
+digraph ZeroTrust {
+    graph [
+        label="ZERO TRUST NETWORK FLOW — Private-Only Compute, No Public Internet Path\nDerived from Bicep | Azure-Bicep-Identity-Lab | NSG + No Public IP + SSH Key Only"
+        labelloc=t
+        fontname="Helvetica"
+        fontsize=14
+        fontcolor="#f0f6fc"
+        bgcolor="#0d1117"
+        pad=1.0
+        nodesep=0.8
+        ranksep=1.2
+        rankdir=LR
+    ]
+
+    node [fontname="Helvetica" fontsize=10 style="filled,rounded" shape=box margin="0.2,0.12"]
+    edge [fontname="Helvetica" fontsize=9]
+
+    // ── Public zone ───────────────────────────────────────────────
+    Internet [
+        label="Internet\n(Public)"
+        shape=triangle
+        fillcolor="#3d1a1a" fontcolor="#f85149" color="#f85149"
+    ]
+
+    NoPublicIP [
+        label="✗  NO PUBLIC IP\n─────────────────────────────\nNo Microsoft.Network/publicIPAddresses\ndeployed in any Bicep module.\nVM has private IP only.\nNo public endpoint exists to reach."
+        shape=octagon
+        fillcolor="#3d1a1a" fontcolor="#f85149" color="#f85149"
+    ]
+
+    // ── Key Vault access control ──────────────────────────────────
+    KVAccess [
+        label="✗  KEY VAULT — RBAC ONLY\n─────────────────────────────\nenableRbacAuthorization: true\nNo access policies.\nOnly UAMI (Key Vault Secrets User)\nhas any permission on this vault."
+        shape=octagon
+        fillcolor="#3d1a1a" fontcolor="#f85149" color="#f85149"
+    ]
+
+    // ── SSH auth control ──────────────────────────────────────────
+    SSHBlock [
+        label="✗  PASSWORD AUTH DISABLED\n─────────────────────────────\ndisablePasswordAuthentication: true\nNo password exists in codebase\nor deployment parameters.\nSSH public key only."
+        shape=octagon
+        fillcolor="#3d1a1a" fontcolor="#f85149" color="#f85149"
+    ]
+
+    // ── VNet boundary ─────────────────────────────────────────────
+    subgraph cluster_vnet {
+        label="Virtual Network: vm-rogers-lab-vnet (10.0.0.0/16)"
+        style=filled
+        fillcolor="#0d1b2a"
+        color="#1f6feb"
+        fontcolor="#79c0ff"
+        fontsize=11
+
+        subgraph cluster_subnet {
+            label="Subnet: default (10.0.1.0/24)"
+            style=filled
+            fillcolor="#0d2137"
+            color="#388bfd"
+            fontcolor="#79c0ff"
+            fontsize=10
+
+            NSG [
+                label="NSG\nvm-rogers-lab-nsg\n──────────────────\nDenyAllInbound\npriority: 4096\nprotocol: * | Any Port\nSource: * → Destination: *\nAll inbound traffic: DENIED"
+                fillcolor="#9e6a03" fontcolor="white" color="#d29922"
+            ]
+
+            NIC [
+                label="Network Interface\nvm-rogers-lab-nic\nPrivate IP: Dynamic\nNo Public IP attached"
+                fillcolor="#1f6feb" fontcolor="white" color="#79c0ff"
+            ]
+
+            VM [
+                label="Virtual Machine\nvm-rogers-lab\nStandard_B1s | Ubuntu 22.04\nSSH Key Auth Only\nUAMI Identity Attached"
+                fillcolor="#1a7f37" fontcolor="white" color="#3fb950"
+            ]
+
+            NSG -> NIC  [label="governs all\ninbound traffic" color="#d29922" fontcolor="#d29922"]
+            NIC -> VM   [label="network\ninterface" color="#3fb950" fontcolor="#56d364"]
+        }
+    }
+
+    // ── Key Vault (outside VNet) ──────────────────────────────────
+    KV [
+        label="Key Vault\nkv-rl-{uniqueString}\nRBAC Only\nNo network isolation\n(Roadmap: add private endpoint)"
+        fillcolor="#6e40c9" fontcolor="white" color="#8957e5"
+        style="filled,rounded,dashed"
+    ]
+
+    // ── Roadmap note ──────────────────────────────────────────────
+    Roadmap [
+        label="⚠  ROADMAP GAPS\n─────────────────────────────\n1. No Private Endpoint on Key Vault\n   (not network-isolated yet)\n2. No Azure Bastion\n   (admin access path undefined)\n3. VM has no public IP\n   (correct) but also no Bastion\n   (admin access gap)"
+        shape=note
+        fillcolor="#161b22" fontcolor="#f85149" color="#d29922"
+        style="filled,dashed"
+    ]
+
+    // ── Blocked paths ─────────────────────────────────────────────
+    Internet -> NoPublicIP  [label="attempt public access"
+                             color="#f85149" fontcolor="#f85149" style=bold]
+    Internet -> SSHBlock    [label="attempt password SSH"
+                             color="#f85149" fontcolor="#f85149" style=dashed]
+    Internet -> KVAccess    [label="attempt KV access\nwithout UAMI token"
+                             color="#f85149" fontcolor="#f85149" style=dashed]
+
+    // ── VM → KV authenticated path ────────────────────────────────
+    VM -> KV                [label="authenticates as UAMI\nKey Vault Secrets User\n(RBAC validated)"
+                             color="#8957e5" fontcolor="#d2a8ff" style=dashed]
+}

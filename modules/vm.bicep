@@ -6,7 +6,30 @@ param adminUsername string = 'azureuser'
 param adminPublicKey string
 param managedIdentityId string // This is the 'Key' we created earlier
 
-// 1. Virtual Network (The 'House' for the VM)
+// 1. Network Security Group (The 'Boundary')
+resource nsg 'Microsoft.Network/networkSecurityGroups@2023-09-01' = {
+  name: '${vmName}-nsg'
+  location: location
+  properties: {
+    securityRules: [
+      {
+        name: 'DenyAllInbound'
+        properties: {
+          priority: 4096
+          direction: 'Inbound'
+          access: 'Deny'
+          protocol: '*'
+          sourcePortRange: '*'
+          destinationPortRange: '*'
+          sourceAddressPrefix: '*'
+          destinationAddressPrefix: '*'
+        }
+      }
+    ]
+  }
+}
+
+// 2. Virtual Network (The 'House' for the VM)
 resource vnet 'Microsoft.Network/virtualNetworks@2023-09-01' = {
   name: '${vmName}-vnet'
   location: location
@@ -14,12 +37,15 @@ resource vnet 'Microsoft.Network/virtualNetworks@2023-09-01' = {
     addressSpace: { addressPrefixes: ['10.0.0.0/16'] }
     subnets: [{
         name: 'default'
-        properties: { addressPrefix: '10.0.1.0/24' }
+        properties: {
+          addressPrefix: '10.0.1.0/24'
+          networkSecurityGroup: { id: nsg.id }
+        }
     }]
   }
 }
 
-// 2. Network Interface (The 'Door')
+// 3. Network Interface (The 'Door')
 resource nic 'Microsoft.Network/networkInterfaces@2023-09-01' = {
   name: '${vmName}-nic'
   location: location
@@ -34,7 +60,7 @@ resource nic 'Microsoft.Network/networkInterfaces@2023-09-01' = {
   }
 }
 
-// 3. The Virtual Machine
+// 4. The Virtual Machine
 resource vm 'Microsoft.Compute/virtualMachines@2023-09-01' = {
   name: vmName
   location: location
@@ -45,7 +71,7 @@ resource vm 'Microsoft.Compute/virtualMachines@2023-09-01' = {
     }
   }
   properties: {
-    hardwareProfile: { vmSize: 'Standard_B1s' } // Low cost for lab
+    hardwareProfile: { vmSize: 'Standard_B1s' }
     osProfile: {
       computerName: vmName
       adminUsername: adminUsername

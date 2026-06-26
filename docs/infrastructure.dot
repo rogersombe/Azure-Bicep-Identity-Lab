@@ -1,0 +1,97 @@
+digraph Infrastructure {
+    graph [
+        label="INFRASTRUCTURE DIAGRAM — Physical Azure Resources and Relationships\nDerived from Bicep | Azure-Bicep-Identity-Lab | Modules: identity + kv + compute"
+        labelloc=t
+        fontname="Helvetica"
+        fontsize=14
+        fontcolor="#f0f6fc"
+        bgcolor="#0d1117"
+        pad=1.0
+        nodesep=0.8
+        ranksep=1.2
+        rankdir=TB
+        splines=polyline
+    ]
+
+    node [fontname="Helvetica" fontsize=10 style="filled,rounded" shape=box margin="0.2,0.12"]
+    edge [fontname="Helvetica" fontsize=9]
+
+    // ── Subscription / Resource Group ─────────────────────────────
+    Subscription [
+        label="Azure Subscription"
+        shape=cylinder
+        fillcolor="#161b22" fontcolor="#f0f6fc" color="#58a6ff"
+    ]
+
+    RG [
+        label="Resource Group\nrg-identity-lab | uksouth"
+        fillcolor="#0d419d" fontcolor="white" color="#388bfd"
+    ]
+
+    // ── Module: identity ──────────────────────────────────────────
+    UAMI [
+        label="User-Assigned Managed Identity\nId-RogersLab-Identity\n─────────────────────\noutput: principalId → KV role assignment\noutput: resourceId → VM identity attachment\n(Note: identityId + resourceId both = uami.id)"
+        fillcolor="#264f78" fontcolor="#cae8ff" color="#58a6ff"
+    ]
+
+    // ── Module: kv ────────────────────────────────────────────────
+    KV [
+        label="Key Vault\nkv-rl-{uniqueString}\n─────────────────────\nSKU: Standard\nenableRbacAuthorization: true\n(RBAC — not access policies)"
+        fillcolor="#6e40c9" fontcolor="white" color="#8957e5"
+    ]
+
+    RoleAssignment [
+        label="Role Assignment\nKey Vault Secrets User\n─────────────────────\nroleId: 4633458b-17de-408a-b874-0445c86b69e6\nprincipalId: UAMI.principalId\nprincipalType: ServicePrincipal\nscope: vault only"
+        fillcolor="#553098" fontcolor="#d2a8ff" color="#8957e5"
+        shape=ellipse
+    ]
+
+    // ── Module: compute ───────────────────────────────────────────
+    NSG [
+        label="NSG\nvm-rogers-lab-nsg\n─────────────────────\nDenyAllInbound\npriority: 4096\nprotocol: * | Any Port\nSource: * | Dest: *"
+        fillcolor="#9e6a03" fontcolor="white" color="#d29922"
+    ]
+
+    VNET [
+        label="Virtual Network\nvm-rogers-lab-vnet\n10.0.0.0/16"
+        fillcolor="#0a3069" fontcolor="#79c0ff" color="#1f6feb"
+    ]
+
+    Subnet [
+        label="Subnet\ndefault\n10.0.1.0/24\nNSG: vm-rogers-lab-nsg"
+        fillcolor="#0a3069" fontcolor="#79c0ff" color="#388bfd"
+    ]
+
+    NIC [
+        label="Network Interface\nvm-rogers-lab-nic\n─────────────────────\nPrivate IP: Dynamic\nNo Public IP\nSubnet: default"
+        fillcolor="#1f6feb" fontcolor="white" color="#79c0ff"
+    ]
+
+    VM [
+        label="Virtual Machine\nvm-rogers-lab\n─────────────────────\nSize: Standard_B1s\nOS: Ubuntu 22.04 LTS\nIdentity: UserAssigned (UAMI)\nPassword Auth: DISABLED\nSSH Key Only"
+        fillcolor="#1a7f37" fontcolor="white" color="#3fb950"
+    ]
+
+    // ── Relationships ─────────────────────────────────────────────
+    Subscription -> RG          [label="contains"               color="#58a6ff" fontcolor="#8b949e"]
+
+    // identity module
+    RG -> UAMI                  [label="module: identity"       color="#58a6ff" fontcolor="#8b949e"]
+
+    // kv module
+    RG -> KV                    [label="module: kv"             color="#8957e5" fontcolor="#8b949e"]
+    KV -> RoleAssignment        [label="scoped to"              color="#8957e5" fontcolor="#8b949e"]
+    UAMI -> RoleAssignment      [label="principalId\n→ role assignment"
+                                 style=dashed color="#58a6ff" fontcolor="#8b949e"]
+
+    // compute module
+    RG -> NSG                   [label="module: compute"        color="#d29922" fontcolor="#8b949e"]
+    RG -> VNET                  [label="module: compute"        color="#0a3069" fontcolor="#8b949e"]
+    VNET -> Subnet              [label="contains"               color="#0a3069" fontcolor="#8b949e"]
+    NSG -> Subnet               [label="associated to"
+                                 style=dashed color="#d29922" fontcolor="#8b949e"]
+    Subnet -> NIC               [label="subnet.id"              color="#1f6feb" fontcolor="#8b949e"]
+    NIC -> VM                   [label="networkInterface"       color="#3fb950" fontcolor="#8b949e"]
+    UAMI -> VM                  [label="resourceId\n→ userAssignedIdentities"
+                                 style=dashed color="#58a6ff" fontcolor="#8b949e"]
+}

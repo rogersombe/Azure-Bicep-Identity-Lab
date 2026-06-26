@@ -1,0 +1,108 @@
+digraph Dependency {
+    graph [
+        label="BICEP DEPENDENCY GRAPH — Module and Resource Creation Order\nDerived from Bicep | Azure-Bicep-Identity-Lab | Arrows = depends on (source must exist first)"
+        labelloc=t
+        fontname="Helvetica"
+        fontsize=14
+        fontcolor="#f0f6fc"
+        bgcolor="#0d1117"
+        pad=1.0
+        nodesep=0.8
+        ranksep=1.2
+        rankdir=TB
+    ]
+
+    node [fontname="Helvetica" fontsize=9 style="filled,rounded" shape=box margin="0.15,0.1"]
+    edge [fontname="Helvetica" fontsize=8 color="#58a6ff" fontcolor="#8b949e"]
+
+    // ── Module nodes ──────────────────────────────────────────────
+
+    // Module 1: identity
+    subgraph cluster_identity {
+        label="Module ①  identity.bicep"
+        style=filled
+        fillcolor="#0d1f33"
+        color="#58a6ff"
+        fontcolor="#79c0ff"
+        fontsize=10
+
+        uami [
+            label="Microsoft.ManagedIdentity\nuserAssignedIdentities\nId-RogersLab-Identity\n─────────────────────\noutput: principalId\noutput: resourceId\n(Note: identityId = resourceId — redundant)"
+            fillcolor="#264f78" fontcolor="#cae8ff" color="#58a6ff"
+        ]
+    }
+
+    // Module 2: kv
+    subgraph cluster_kv {
+        label="Module ②  keyvault.bicep  (depends on identity.principalId)"
+        style=filled
+        fillcolor="#1a0d33"
+        color="#8957e5"
+        fontcolor="#d2a8ff"
+        fontsize=10
+
+        vault [
+            label="Microsoft.KeyVault/vaults\nkv-rl-{uniqueString(rg.id)}\nenableRbacAuthorization: true\nSKU: Standard"
+            fillcolor="#6e40c9" fontcolor="white" color="#8957e5"
+        ]
+
+        roleAssign [
+            label="Microsoft.Authorization/roleAssignments\nKey Vault Secrets User\n4633458b-17de-408a-b874-0445c86b69e6\nprincipalId: identity.outputs.principalId\nscope: vault\nAbsolute role definition path"
+            fillcolor="#553098" fontcolor="#d2a8ff" color="#8957e5"
+            shape=ellipse
+        ]
+
+        vault -> roleAssign [label="scope" color="#8957e5" fontcolor="#d2a8ff"]
+    }
+
+    // Module 3: compute
+    subgraph cluster_compute {
+        label="Module ③  vm.bicep  (depends on identity.resourceId)"
+        style=filled
+        fillcolor="#0d1f0d"
+        color="#3fb950"
+        fontcolor="#56d364"
+        fontsize=10
+
+        nsg [
+            label="Microsoft.Network/networkSecurityGroups\nvm-rogers-lab-nsg\nDenyAllInbound | priority: 4096"
+            fillcolor="#9e6a03" fontcolor="white" color="#d29922"
+        ]
+
+        vnet [
+            label="Microsoft.Network/virtualNetworks\nvm-rogers-lab-vnet\n10.0.0.0/16\nSubnet: default (10.0.1.0/24)\nNSG associated to subnet"
+            fillcolor="#0a3069" fontcolor="#79c0ff" color="#1f6feb"
+        ]
+
+        nic [
+            label="Microsoft.Network/networkInterfaces\nvm-rogers-lab-nic\nPrivate IP: Dynamic\nsubnet: vnet.subnets[0].id"
+            fillcolor="#1f6feb" fontcolor="white" color="#79c0ff"
+        ]
+
+        vm [
+            label="Microsoft.Compute/virtualMachines\nvm-rogers-lab\nStandard_B1s | Ubuntu 22.04 LTS\nidentity: UserAssigned\nuserAssignedIdentities: { identity.resourceId: {} }\nSSH only | Password: DISABLED"
+            fillcolor="#1a7f37" fontcolor="white" color="#3fb950"
+        ]
+
+        // Within-module dependencies
+        nsg -> vnet     [label="nsg.id → subnet.nsg" color="#d29922" fontcolor="#d29922"]
+        vnet -> nic     [label="subnets[0].id" color="#1f6feb" fontcolor="#8b949e"]
+        nic -> vm       [label="nic.id" color="#3fb950" fontcolor="#8b949e"]
+    }
+
+    // ── Cross-module dependencies ─────────────────────────────────
+    uami -> vault       [label="identity.outputs.principalId\n→ roleAssignment.principalId"
+                         color="#388bfd" fontcolor="#79c0ff" style=dashed]
+    uami -> roleAssign  [label="principalId"
+                         color="#388bfd" fontcolor="#79c0ff" style=dashed]
+    uami -> vm          [label="identity.outputs.resourceId\n→ userAssignedIdentities"
+                         color="#388bfd" fontcolor="#79c0ff" style=dashed]
+
+    // ── Parallel deployment note ──────────────────────────────────
+    parallel [
+        label="Modules ② and ③ deploy in PARALLEL\nafter Module ① completes.\nBicep resolves this automatically\nfrom output references."
+        shape=note
+        fillcolor="#161b22" fontcolor="#8b949e" color="#30363d"
+        style="filled,dashed"
+    ]
+}
